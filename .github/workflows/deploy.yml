@@ -3,26 +3,47 @@ name: Deploy
 on:
   push:
     branches:
-      - 'master'
-    tags-ignore:
-      - '**'
+      - main
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Build page
-      run: |
-        npm install
-        npm run build
-        cp CNAME dist
+      - name: Setup Node
+        uses: actions/setup-node@v3
 
-    - name: Publish github pages
-      run: |
-        git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/SEWsam/yack
-        npx gh-pages -d dist -u "github-actions-bot <support+actions@github.com>"
-      env:
-        GITHUB_TOKEN: ${{ secrets.ACTIONS_TOKEN }}
+      - name: Install dependencies
+        uses: bahmutov/npm-install@v1
+
+      - name: Build project
+        run: npm run build
+
+      - name: Upload production-ready build files
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-files
+          path: ./dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: production-files
+          path: ./dist
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
